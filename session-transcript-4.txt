@@ -1,0 +1,112 @@
+================================================================================
+POMODORO TERMINAL — SESSION TRANSCRIPT
+Session: Notify Feature (Browser Notifications + Ambient Sounds) + Bug Fix
+================================================================================
+
+--------------------------------------------------------------------------------
+USER:
+let build the 5th feature, let me know if there are any bugs or issues that I
+should take note of for future development.
+--------------------------------------------------------------------------------
+
+ASSISTANT:
+Built the notify feature across four files:
+
+1. app/hooks/useNotify.ts (new)
+   - useNotify hook manages browser Notification API
+   - Tracks permission state: "default" | "granted" | "denied" | "unsupported"
+   - requestPermission() prompts the browser permission dialog
+   - notify(title, body) sends a notification only when permission is "granted"
+   - Gracefully handles browsers without Notification support (e.g. iOS Safari)
+
+2. app/hooks/useAmbientSound.ts (new)
+   - useAmbientSound hook manages Web Audio API audio context lifecycle
+   - Procedurally generates three sound types from noise buffers (no audio files):
+       rain       — lowpass-filtered noise (~550 Hz cutoff, warm rumble)
+       white-noise — flat noise, full spectrum
+       lo-fi      — bandpass-filtered noise (180 Hz HP → 2800 Hz LP, muffled)
+   - cycleSound() rotates through: off → rain → white-noise → lo-fi → off
+   - Volume control (0–100%) via a range input
+   - AudioContext is created lazily on first sound selection (respects browser
+     autoplay policy — requires a user gesture before audio can start)
+   - Proper cleanup: stops source + disconnects nodes on sound change or unmount
+   - AudioContext is closed on component unmount to free resources
+
+3. app/components/NotifyPanel.tsx (new)
+   - Terminal-styled panel: $ notify --configure
+   - Amber (#ffb000) color scheme to distinguish from settings (cyan) and timer (green)
+   - Shows browser notification permission status with color coding
+     (green = granted, red = denied, amber = not set)
+   - "enable notifications" button when permission is "default"
+   - Sound selector: clickable buttons for each sound type with active highlight
+   - Volume slider (visible only when a sound is active)
+   - Comment line: "# procedural audio via web audio api"
+   - [esc] closes the panel
+
+4. app/components/PomodoroTimer.tsx (updated)
+   - Added naturalTransitions: number to State (increments only on natural timer
+     completions, not manual skips) — reliable signal for when to send notifications
+   - advance() increments naturalTransitions when natural=true
+   - useNotify() and useAmbientSound() hooks wired in
+   - Notification effect watches state.naturalTransitions:
+       work → break: "Session done — enjoy your [short/long] break!"
+       break → work: "Break complete — time to focus!"
+   - New keyboard shortcuts:
+       [a] — cycle ambient sound
+       [b] — toggle notify panel
+   - New "notify" button in controls row (amber, left of "config")
+   - NotifyPanel rendered below SettingsPanel when showNotify is true
+   - cycleSound added to handleKey useCallback deps
+
+Notes for future development:
+
+1. lo-fi sound is bandpass-filtered noise — not actual music. To implement real
+   lo-fi, host an audio file and load it via fetch() into an AudioBufferSourceNode,
+   or use an <audio> element. The current implementation is a warm-ambience
+   placeholder.
+
+2. Notification permission on iOS Safari — the Notification API is unsupported in
+   iOS Safari and some mobile browsers. The "unsupported" permission state handles
+   this gracefully; notify is effectively a desktop-only feature.
+
+3. AudioContext autoplay policy — browsers require a user gesture before audio can
+   start. The current code creates AudioContext lazily on first sound button click,
+   which satisfies this requirement. Do not attempt to auto-start ambient sound on
+   page load.
+
+4. Running timer + duration change UX — if the user changes duration while the
+   timer is running and the new duration is shorter than timeLeft, APPLY_DURATIONS
+   is intentionally a no-op (so a live session isn't abruptly cut). A future
+   enhancement could offer to advance to the next phase in that scenario.
+
+--------------------------------------------------------------------------------
+USER:
+In the config / user settings for the timer, when I reduced the number in the
+settings from 25 to 10 and updated it, there is an error message that says:
+"repeat count must be non-negative".
+--------------------------------------------------------------------------------
+
+ASSISTANT:
+Root cause identified and fixed.
+
+BUG — ProgressBar crashes when timeLeft > total after a duration reduction
+  File: app/components/PomodoroTimer.tsx — ProgressBar component
+
+  Problem:
+    APPLY_DURATIONS intentionally skips updating timeLeft when the timer is
+    running (to avoid disrupting a live session). But when the user reduces the
+    work duration (e.g. 25 min → 10 min), settings updates immediately while
+    timeLeft stays at the old large value.
+
+    value = total - timeLeft = 600 - 1500 = -900 (negative)
+    filled = Math.round((-900 / 600) * 28) = -42
+    "█".repeat(-42) → throws RangeError: "repeat count must be non-negative"
+
+  Fix: Clamp the percentage to [0, 1] before computing bar fill width.
+    Before: const filled = Math.round((value / total) * 28);
+    After:  const pct = total > 0 ? Math.max(0, Math.min(1, value / total)) : 0;
+            const filled = Math.round(pct * 28);
+
+  This also guards against total === 0 (division by zero) as a bonus.
+
+================================================================================

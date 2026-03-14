@@ -1,0 +1,18 @@
+Base Tier:
+
+PomodoroSH is a Pomodoro timer built for students who want to stay in flow. This Timer helps students balance their work sessions and breaks, track your progress over time, and manage task lists, with the design of a linux terminal-inspired interface.
+
+Technologies:
+- Front-End: Nextjs, React, TailwindCSS
+- Languages: TypeScript 
+
+Feature List:
+1. Timer — 25-min work sessions, 5-min short breaks, 15-min long breaks
+2. Sessions — Track completed pomodoros with daily/weekly stats & streaks, and change light/dark modes
+3. Tasks — Add tasks, assign pomodoro estimates, mark them complete
+4. Settings — Configure durations, auto-start, and persist across sessions
+5. Notify — Browser notifications + ambient sounds (rain, white noise, lo-fi)
+6. Light & Dark Modes — Allows the user to change the timer's UI to their preferences
+
+Known bugs or limitations:
+The main limitation is that it can not be saved to a RESTAPI database, this means that the user does not have any login functionality and can not transfer over their progress and settings to different devices. 

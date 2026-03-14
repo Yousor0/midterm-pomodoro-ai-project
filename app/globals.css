@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
+/* ============================================================
+   DESIGN TOKENS — dark mode (default)
+   ============================================================ */
 :root {
+  /* Core palette */
   --background: #0d1117;
   --foreground: #33ff33;
   --terminal-green: #33ff33;
@@ -8,10 +12,66 @@
   --terminal-amber: #ffb000;
   --terminal-cyan: #00ffff;
   --terminal-red: #ff3333;
+  --terminal-muted: #555555;
+  --terminal-comment: #333333;
+
+  /* Structural */
   --terminal-border: #1f2f1f;
   --terminal-surface: #0f1a0f;
+
+  /* Panel surfaces (tinted per panel) */
+  --settings-surface: #0a1520;
+  --settings-border: rgba(0, 255, 255, 0.267);
+  --settings-divider: #1f2f1f;
+  --notify-surface: #1a1400;
+  --notify-border: rgba(255, 176, 0, 0.267);
+  --notify-divider: #2a1f00;
+  --notify-inactive: #2a2000;
+
+  /* Small glows (inline text-shadow) */
+  --glow-green-sm: 0 0 6px rgba(51, 255, 51, 0.6);
+  --glow-amber-sm: 0 0 6px rgba(255, 176, 0, 0.6);
+  --glow-cyan-sm: 0 0 6px rgba(0, 255, 255, 0.4);
+
+  /* Outer container shadow */
+  --terminal-outer-glow: 0 0 40px rgba(51, 255, 51, 0.08);
 }
 
+/* ============================================================
+   DESIGN TOKENS — light mode
+   ============================================================ */
+[data-theme="light"] {
+  --background: #f0f4ec;
+  --foreground: #1a6b1a;
+  --terminal-green: #1a6b1a;
+  --terminal-dim: #4a8c4a;
+  --terminal-amber: #b86900;
+  --terminal-cyan: #007878;
+  --terminal-red: #cc2222;
+  --terminal-muted: #7a9070;
+  --terminal-comment: #a0b090;
+
+  --terminal-border: #bccdb8;
+  --terminal-surface: #e4ead8;
+
+  --settings-surface: #d8e8f5;
+  --settings-border: rgba(0, 120, 120, 0.3);
+  --settings-divider: #bccdb8;
+  --notify-surface: #f5ebd0;
+  --notify-border: rgba(184, 105, 0, 0.3);
+  --notify-divider: #d8c890;
+  --notify-inactive: #d8c890;
+
+  --glow-green-sm: none;
+  --glow-amber-sm: none;
+  --glow-cyan-sm: none;
+
+  --terminal-outer-glow: 0 2px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================
+   TAILWIND THEME BRIDGE
+   ============================================================ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -19,6 +79,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ============================================================
+   BASE
+   ============================================================ */
 * {
   box-sizing: border-box;
 }
@@ -27,9 +90,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Geist Mono", "Courier New", Courier, monospace;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
-/* CRT scanline effect */
+/* ============================================================
+   CRT SCANLINE — dark mode only
+   ============================================================ */
 body::before {
   content: "";
   position: fixed;
@@ -48,36 +116,91 @@ body::before {
   z-index: 9999;
 }
 
-/* Blinking cursor animation */
+[data-theme="light"] body::before {
+  display: none;
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 .cursor-blink {
   animation: blink 1s step-end infinite;
 }
 
-/* Typing animation */
-@keyframes typing {
-  from { width: 0; }
-  to { width: 100%; }
-}
-
-/* Glow effect */
+/* ============================================================
+   GLOW UTILITIES
+   ============================================================ */
 .terminal-glow {
-  text-shadow: 0 0 8px var(--terminal-green), 0 0 16px rgba(51, 255, 51, 0.3);
+  text-shadow:
+    0 0 8px var(--terminal-green),
+    0 0 16px rgba(51, 255, 51, 0.3);
 }
 
 .terminal-glow-amber {
-  text-shadow: 0 0 8px var(--terminal-amber), 0 0 16px rgba(255, 176, 0, 0.3);
+  text-shadow:
+    0 0 8px var(--terminal-amber),
+    0 0 16px rgba(255, 176, 0, 0.3);
 }
 
 .terminal-glow-cyan {
-  text-shadow: 0 0 8px var(--terminal-cyan), 0 0 16px rgba(0, 255, 255, 0.3);
+  text-shadow:
+    0 0 8px var(--terminal-cyan),
+    0 0 16px rgba(0, 255, 255, 0.3);
 }
 
-/* Scrollbar */
+[data-theme="light"] .terminal-glow,
+[data-theme="light"] .terminal-glow-amber,
+[data-theme="light"] .terminal-glow-cyan {
+  text-shadow: none;
+}
+
+/* ============================================================
+   COMMON COMPONENT UTILITIES
+   ============================================================ */
+
+/* Panel container (Settings, Notify) */
+.term-panel {
+  border-radius: 0.25rem;
+  padding: 1rem;
+  border-width: 1px;
+  border-style: solid;
+}
+
+@media (min-width: 768px) {
+  .term-panel {
+    padding: 1.5rem;
+  }
+}
+
+/* Keyboard hint badge */
+.term-kbd {
+  border: 1px solid currentColor;
+  padding: 0 0.25rem;
+  border-radius: 0.2rem;
+  font-size: 10px;
+}
+
+/* Muted section label */
+.term-section-label {
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: var(--terminal-dim);
+  letter-spacing: 0.05em;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
 ::-webkit-scrollbar {
   width: 6px;
 }

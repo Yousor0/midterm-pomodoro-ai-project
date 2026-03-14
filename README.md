@@ -16,5 +16,3 @@ PomodoroSH is a Pomodoro timer built for students who want to stay in flow. This
 - React
 - TypeScript
 - TailwindCSS
-- Zustand
-- Recharts

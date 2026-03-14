@@ -1,0 +1,126 @@
+================================================================================
+POMODORO TERMINAL — SESSION TRANSCRIPT
+Session: CSS Variable Standardization + Light Mode + Bug Fixes
+================================================================================
+
+--------------------------------------------------------------------------------
+USER:
+for repetitive colors and styles can you standardize them and put them in the
+global.css, and also after that make a light mode version and a toggle button
+in the config panel
+--------------------------------------------------------------------------------
+
+A:
+Implemented design token standardization and light/dark mode across 8 files.
+
+1. app/globals.css (rewritten)
+   - All colors moved to CSS custom properties under :root
+   - New vars added beyond what existed:
+       --terminal-muted, --terminal-comment (for muted/comment text)
+       --settings-surface/border/divider (panel-specific tints)
+       --notify-surface/border/divider/inactive
+       --glow-green-sm, --glow-amber-sm, --glow-cyan-sm (inline text-shadow vals)
+       --terminal-outer-glow (container box-shadow)
+   - [data-theme="light"] block overrides all vars with a readable day-mode palette:
+       background: #f0f4ec, green: #1a6b1a, amber: #b86900, cyan: #007878, etc.
+       Panel surfaces tinted in matching light hues (blue-ish settings, warm notify)
+       Glow vars set to "none" (no phosphor glow in light mode)
+   - CRT scanline hidden in light mode: [data-theme="light"] body::before { display: none }
+   - body gets transition: background 0.2s, color 0.2s for smooth theme switch
+   - Utility classes added: .term-panel, .term-kbd, .term-section-label
+
+2. app/hooks/useTheme.ts (new)
+   - Reads saved theme from localStorage on mount, applies data-theme to <html>
+   - toggleTheme() flips dark/light, updates DOM attribute and localStorage
+   - Returns { theme, toggleTheme }
+
+3. app/layout.tsx (updated)
+   - Added suppressHydrationWarning to <html> tag
+   - Inline <script> reads localStorage before first paint to prevent flash:
+       try{var t=localStorage.getItem('pomodoro-theme');
+       if(t==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}
+
+4. app/components/TerminalChrome.tsx (updated)
+   - All hardcoded hex replaced with var(--...) inline styles
+   - Title bar dots, nav links, outer shadow, status bar all theme-aware
+   - Active nav: color=var(--background) on bg=var(--terminal-green) (inverts correctly)
+
+5. app/components/Settings.tsx (updated)
+   - Added theme: Theme and onToggleTheme: () => void props
+   - New theme_mode row: shows ◑ dark / ☀ light, calls onToggleTheme on click
+   - Extracted reusable Toggle sub-component for boolean rows (used by auto_start)
+   - All colors replaced with var(--...) or CSS var strings
+
+6. app/components/NotifyPanel.tsx (updated)
+   - All hardcoded hex replaced with CSS vars
+   - PERMISSION_COLOR map now uses var(--terminal-green/red/amber/muted)
+   - Sound button active state uses rgba(255,176,0,0.07) bg (theme-neutral tint)
+
+7. app/components/PomodoroTimer.tsx (updated)
+   - Added useTheme() hook — applies data-theme and provides toggle
+   - MODE_COLOR_DARK / MODE_COLOR_LIGHT objects (separate hex palettes per theme)
+   - MODE_GLOW_DARK / MODE_GLOW_LIGHT (light mode uses subtle drop shadows)
+   - const MODE_COLOR / MODE_GLOW selected by theme at render time
+   - All static hex inline styles replaced with var(--...)
+   - SettingsPanel now receives theme and onToggleTheme props
+
+--------------------------------------------------------------------------------
+USER:
+[console error] A tree hydrated but some attributes of the server rendered HTML
+didn't match the client properties [...] html data-theme="light"
+--------------------------------------------------------------------------------
+
+A:
+Root cause: the inline script sets data-theme on <html> before React hydrates,
+but the server renders <html> without that attribute, causing a mismatch.
+
+Fix: added suppressHydrationWarning to <html> in layout.tsx.
+  Before: <html lang="en">
+  After:  <html lang="en" suppressHydrationWarning>
+
+suppressHydrationWarning only suppresses the warning one level deep (the <html>
+element itself) — it does not mask real hydration bugs in app components.
+
+--------------------------------------------------------------------------------
+USER:
+light mode does not make the task list, about page, or stats into light mode —
+it is still in dark mode
+--------------------------------------------------------------------------------
+
+A:
+Two issues identified and fixed:
+
+ISSUE 1 — Hardcoded hex in TaskList, stats page, and about page
+  These three files were never updated — they still used hardcoded hex values
+  that don't respond to CSS variable changes.
+
+ISSUE 2 — useTheme only called in PomodoroTimer (timer page only)
+  On /stats and /about, PomodoroTimer doesn't render, so the data-theme
+  attribute was only set by the anti-flash script. Combined with hardcoded
+  colors, the pages appeared dark regardless.
+
+Files updated — all hardcoded hex replaced with CSS variable references:
+
+  app/components/TaskList.tsx
+    - Panel border/bg → var(--terminal-border/surface)
+    - All text colors → var(--terminal-green/dim/amber/cyan/red)
+    - Hover states moved from Tailwind classes to onMouseEnter/onMouseLeave
+      (cleaner than verbose arbitrary CSS-var Tailwind hover classes)
+    - Focus border handled via onFocus/onBlur inline style updates
+    - Input placeholder color via inline style on the element
+
+  app/stats/page.tsx
+    - StatRow label/sub default color → var(--terminal-dim)
+    - Panel border/bg → var(--terminal-border/surface)
+    - Streak color conditional → var(--terminal-amber/cyan)
+    - Status line cursor → var(--terminal-green)
+
+  app/about/page.tsx
+    - All text colors → var(--terminal-green/dim/amber/cyan)
+    - ASCII banner textShadow → .terminal-glow class (already light-mode aware)
+    - All inline textShadow → .terminal-glow-cyan / .terminal-glow-amber classes
+    - README box border/bg → var(--terminal-border/surface)
+    - Tech badges → var(--terminal-border/cyan)
+    - Typing cursor → var(--terminal-green)
+
+================================================================================
