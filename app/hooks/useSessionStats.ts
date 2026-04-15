@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-
-const STORAGE_KEY = "pomodoro-sessions";
+import { createClient } from "../lib/client";
 
 interface DayRecord {
   date: string; // "YYYY-MM-DD"
@@ -26,7 +25,6 @@ function todayStr() {
 
 // Subtract one calendar day from a "YYYY-MM-DD" string using local time
 function prevDay(dateStr: string) {
-  // Parse at noon local time to avoid DST edge cases
   const d = new Date(`${dateStr}T12:00:00`);
   d.setDate(d.getDate() - 1);
   return localDateStr(d);
@@ -36,17 +34,16 @@ function computeStats(days: DayRecord[]) {
   const today = todayStr();
   const todayCount = days.find((d) => d.date === today)?.count ?? 0;
 
-  // Last 7 days including today — compare as date strings (both local)
-  const sevenDaysAgo = localDateStr(new Date(new Date().setDate(new Date().getDate() - 7)));
+  const sevenDaysAgo = localDateStr(
+    new Date(new Date().setDate(new Date().getDate() - 7)),
+  );
   const weeklyCount = days
     .filter((d) => d.date >= sevenDaysAgo)
     .reduce((s, d) => s + d.count, 0);
 
   const totalCount = days.reduce((s, d) => s + d.count, 0);
-
   const bestDay = days.reduce((best, d) => Math.max(best, d.count), 0);
 
-  // Streak: consecutive days ending today (or yesterday if today has 0)
   const sorted = [...days].sort((a, b) => b.date.localeCompare(a.date));
   let streak = 0;
   const yesterday = prevDay(today);
@@ -54,8 +51,8 @@ function computeStats(days: DayRecord[]) {
     todayCount > 0
       ? today
       : days.find((d) => d.date === yesterday)
-      ? yesterday
-      : null;
+        ? yesterday
+        : null;
 
   if (anchor) {
     let expected = anchor;
@@ -77,32 +74,62 @@ export function useSessionStats() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      setData(raw ? JSON.parse(raw) : { days: [] });
-    } catch {
-      setData({ days: [] });
-    }
-    setLoaded(true);
+    const supabase = createClient();
+
+    supabase.auth.getUser().then(async ({ data: userData }) => {
+      const uid = userData.user?.id;
+      if (!uid) {
+        setLoaded(true);
+        return;
+      }
+
+      const { data: rows } = await supabase
+        .from("pomodoro_sessions")
+        .select("date, count")
+        .eq("user_id", uid);
+
+      if (rows) {
+        setData({ days: rows.map((r) => ({ date: r.date, count: r.count })) });
+      }
+      setLoaded(true);
+    });
   }, []);
 
   const recordSession = useCallback(() => {
+    const today = todayStr();
+
+    // Optimistic update
     setData((prev) => {
-      const today = todayStr();
       const existing = prev.days.find((d) => d.date === today);
       const newDays: DayRecord[] = existing
         ? prev.days.map((d) =>
-            d.date === today ? { ...d, count: d.count + 1 } : d
+            d.date === today ? { ...d, count: d.count + 1 } : d,
           )
         : [...prev.days, { date: today, count: 1 }];
-      const next = { days: newDays };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // storage full or unavailable
-      }
-      return next;
+      return { days: newDays };
     });
+
+    // Persist — upsert the incremented count
+    (async () => {
+      const supabase = createClient();
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) return;
+
+      // Read current DB value to avoid a race if multiple tabs are open
+      const { data: existing } = await supabase
+        .from("pomodoro_sessions")
+        .select("count")
+        .eq("user_id", uid)
+        .eq("date", today)
+        .single();
+
+      await supabase.from("pomodoro_sessions").upsert({
+        user_id: uid,
+        date: today,
+        count: (existing?.count ?? 0) + 1,
+      });
+    })();
   }, []);
 
   return { stats: computeStats(data.days), recordSession, loaded };
