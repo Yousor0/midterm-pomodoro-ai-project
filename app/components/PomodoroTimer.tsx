@@ -9,6 +9,7 @@ import { useAmbientSound } from "../hooks/useAmbientSound";
 import TaskList from "./TaskList";
 import SettingsPanel from "./Settings";
 import NotifyPanel from "./NotifyPanel";
+import { useAuth } from "../hooks/useAuth";
 
 type Mode = "work" | "short" | "long";
 
@@ -194,6 +195,7 @@ export default function PomodoroTimer() {
     naturalTransitions: 0,
   });
 
+  const { user, signOut } = useAuth();
   const { recordSession } = useSessionStats();
   const prevCompleted = useRef(0);
 
@@ -424,11 +426,21 @@ export default function PomodoroTimer() {
 
       {/* Status line */}
       <div className="flex items-center gap-2 text-sm">
-        <span style={{ color: "var(--terminal-cyan)" }}>user@pomodoro-terminal:~$</span>
+        <span style={{ color: "var(--terminal-cyan)" }}>
+          {user?.email ?? "user"}@pomodoro-terminal:~$
+        </span>
         <span
           className="cursor-blink inline-block w-2.5 h-5"
           style={{ backgroundColor: "var(--terminal-green)" }}
         />
+        <button
+          onClick={signOut}
+          className="ml-auto text-xs hover:opacity-80 transition-opacity"
+          style={{ color: "var(--terminal-dim)" }}
+        >
+          <kbd className="term-kbd">q</kbd>
+          logout
+        </button>
       </div>
     </div>
   );

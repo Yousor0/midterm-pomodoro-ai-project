@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createClient } from "../lib/client";
 
 export interface Settings {
   workDuration: number; // minutes
-  shortBreak: number; // minutes
-  longBreak: number; // minutes
+  shortBreak: number;   // minutes
+  longBreak: number;    // minutes
   autoStart: boolean;
 }
 
@@ -16,32 +17,51 @@ export const DEFAULT_SETTINGS: Settings = {
   autoStart: false,
 };
 
-const STORAGE_KEY = "pomodoro-settings";
-
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+    const supabase = createClient();
+
+    supabase.auth.getUser().then(async ({ data: userData }) => {
+      const uid = userData.user?.id;
+      if (!uid) { setLoaded(true); return; }
+
+      const { data } = await supabase
+        .from("user_settings")
+        .select("*")
+        .eq("user_id", uid)
+        .single();
+
+      if (data) {
+        setSettings({
+          workDuration: data.work_duration,
+          shortBreak: data.short_break,
+          longBreak: data.long_break,
+          autoStart: data.auto_start,
+        });
       }
-    } catch {
-      // ignore malformed storage
-    }
-    setLoaded(true);
+      setLoaded(true);
+    });
   }, []);
 
-  const save = useCallback((next: Settings) => {
+  const save = useCallback(async (next: Settings) => {
     setSettings(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // ignore storage errors
-    }
+
+    const supabase = createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) return;
+
+    await supabase.from("user_settings").upsert({
+      user_id: uid,
+      work_duration: next.workDuration,
+      short_break: next.shortBreak,
+      long_break: next.longBreak,
+      auto_start: next.autoStart,
+      updated_at: new Date().toISOString(),
+    });
   }, []);
 
   return { settings, save, loaded };
