@@ -1,5 +1,8 @@
 Base Tier:
 
+GITHUB: https://github.com/Yousor0/midterm-pomodoro-ai-project 
+VERCEL: https://midterm-pomodoro-ai-project-17h7.vercel.app/
+
 PomodoroSH is a Pomodoro timer built for students who want to stay in flow. This Timer helps students balance their work sessions and breaks, track your progress over time, and manage task lists, with the design of a linux terminal-inspired interface.
 
 Technologies:
